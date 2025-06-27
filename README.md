@@ -77,3 +77,13 @@ very opinionated by the Tire developers. Custom profiles can be stored remotely 
 `tool.tire.profile` option to use instead. Remote profiles are cached locally, so you can continue to use Tire when
 going offline.
 
+## Development
+
+If you have [Mise](https://mise.jdx.dev/), simply run
+
+```console
+$ mise install
+$ mise run setup
+```
+
+This will install the required development tools and install the pre-commit hook.

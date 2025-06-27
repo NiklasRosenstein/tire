@@ -1,7 +1,7 @@
 [tools]
-pre-commit = "latest"
-rust = "latest"
-typos = "latest"
+pre-commit = "4.2.0"
+rust = "1.87.0"
+typos = "1.33.1"
 
-[tasks.install-pre-commit]
+[tasks.setup]
 run = "ln -sf ../../.github/pre-commit .git/hooks"
