@@ -3,6 +3,7 @@ name = "tire"
 version = "0.1.0"
 edition = "2024"
 license = "MIT - OSI approved"
+description = "Tire provides a single interface for the most common workflows in a typical, modern Python project."
 
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
