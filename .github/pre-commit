@@ -19,4 +19,4 @@ cargo fmt --check
 if command -v typos >/dev/null; then
     typos
 fi
-cargo clippy --all -- --deny warnings
+cargo clippy --all-targets --workspace -- -D warnings -D clippy::all
