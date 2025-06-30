@@ -13,6 +13,13 @@ warn_redundant_casts = true
 warn_unreachable = true
 warn_unused_ignores = true
 
+[tool.pytest.ini_options]
+addopts = "--doctest-modules"
+verbosity_test_cases = 1
+verbosity_assertions = 2
+console_output_style = "count"
+log_cli_level = "info"
+
 [tool.ruff]
 line-length = 120
 

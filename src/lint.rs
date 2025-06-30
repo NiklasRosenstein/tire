@@ -1,13 +1,13 @@
 //! Implements the `tire check` command.
 
 use crate::{
-    profile::materialize_pyproject_toml_to_tmp,
+    profile::Profile,
     utils::{run_command_or_exit, string_vec},
 };
 
 pub fn lint(files: Vec<String>, fix: bool, unsafe_fixes: bool) {
     // Write the merged configuration to a temporary file
-    let pyproject_toml = materialize_pyproject_toml_to_tmp();
+    let pyproject_toml = Profile::load(None).unwrap().materialize(None).unwrap();
 
     // Run dmypy with the merged config file
     let mut uv_command = string_vec![
@@ -17,7 +17,7 @@ pub fn lint(files: Vec<String>, fix: bool, unsafe_fixes: bool) {
         "ruff",
         "ruff",
         "--config",
-        pyproject_toml.path.to_string_lossy().to_string(),
+        pyproject_toml.to_string_lossy().to_string(),
         "check"
     ];
 

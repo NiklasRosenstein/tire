@@ -1,75 +1,159 @@
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
+//! This module implements everything related to Tire profiles.
+//!
+//! A profile is a partial `pyproject.toml` that contains all relevant `[tool.*]` configuration
+//! values for the tools that Tire supports. This is strictly limited to the supported tools, and
+//! any `[tool.<KEY>]` that is not one of the [known tools][KNOWN_TOOLS] will cause trigger a
+//! warning when loading a profile and be ignored when applied to the `pyproject.toml`.
+//!
+//! The [`default`][DEFAULT_PROFILE] is embedded into the Tire binary itself. However, other
+//! profiles can be used by referring to them via a URL that returns the profile in TOML format.
+//! HTTPS and HTTP URLs are supported.
 
-use tempfile::TempDir;
+use std::path::{Path, PathBuf};
+
 use toml::value::*;
 
 use crate::utils::find_pyproject_toml;
 
-/// This contains the accepted `[tool.*]` sections that are actually supported by Tire. Any
-/// additional tool sections are not allowed.
-const ACCEPTED_TOOLS: [&str; 2] = ["mypy", "ruff"];
+/// The default profile configuration that comes with Tire.
+const DEFAULT_PROFILE: &str = include_str!("../profiles/default.toml");
 
-/// Represents a Tire profile configuration.
+/// This contains the names of all well-known `[tool.*]` sections for tools that Tire supports.
+const KNOWN_TOOLS: [&str; 3] = ["mypy", "pytest", "ruff"];
+
+/// Checks if the given string is contained in one of the [KNOWN_TOOLS].
+pub fn is_known_tool<S: Into<String>>(tool: S) -> bool {
+    let s: String = tool.into();
+    let s = s.as_str();
+    KNOWN_TOOLS.iter().any(|x| s.eq(*x))
+}
+
+/// Error type for loading a profile.
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Ser(#[from] toml::ser::Error),
+
+    #[error(transparent)]
+    De(#[from] toml::de::Error),
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("invalid profile {0:?}")]
+    InvalidProfile(String),
+}
+
+/// Represents a deserialized Tire profile.
 #[derive(Debug)]
 pub struct Profile {
+    /// The name of the profile. `default` if [DEFAULT_PROFILE] was used, otherwise usually a
+    /// URL pointing to the profile.
+    pub name: String,
+
+    /// The deserialized TOML file.
     pub root: Table,
 }
 
 impl Profile {
+    /// Main entrypoint for loading a profile.
+    ///
+    /// If [None] or [Some] with value `"default"` is specified, the [DEFAULT_PROFILE] is loaded.
+    /// Otherwise, a URL is expected and it is loaded from the network.
+    ///
+    /// TODO: Support caching already fetched URLs on disk.
+    pub fn load(name: Option<String>) -> Result<Self, Error> {
+        match name {
+            None => Self::load_string("default".to_owned(), DEFAULT_PROFILE.to_owned()),
+            Some(name) => {
+                if name == *"default" {
+                    Self::load_string("default".to_owned(), DEFAULT_PROFILE.to_owned())
+                } else if name.starts_with("http://") || name.starts_with("https://") {
+                    Self::load_url(name)
+                } else {
+                    Err(Error::InvalidProfile(name))
+                }
+            }
+        }
+    }
+
+    /// Load a profile from the given URL.
+    pub fn load_url(url: String) -> Result<Self, Error> {
+        let content = reqwest::blocking::get(url.clone())?.text()?;
+        Self::load_string(url, content)
+    }
+
     /// Load a profile from the given TOML-encoded file.
-    pub fn load_file(toml_file: &Path) -> Result<Self, Box<dyn Error>> {
-        Ok(Self::load_string(std::fs::read_to_string(toml_file)?)?)
+    pub fn load_file(toml_file: &Path) -> Result<Self, Error> {
+        Self::load_string(
+            format!("file://{}", toml_file.to_string_lossy()),
+            std::fs::read_to_string(toml_file)?,
+        )
     }
 
     /// Load a profile from the given TOML-encoded string.
-    pub fn load_string(toml_text: String) -> Result<Self, toml::de::Error> {
+    pub fn load_string(name: String, toml_text: String) -> Result<Self, Error> {
         Ok(Profile {
+            name,
             root: toml_text.parse::<Table>()?,
         })
     }
 
-    /// Validate the profile.
-    pub fn validate(&self) -> Result<(), String> {
-        let disallowed_root_keys: Vec<&String> = self
+    /// Validate the profile, emitting warning logs if the contents look off, removing any
+    /// keys from the profile that are unsupported.
+    pub fn validate(&mut self) {
+        // Check that there is only a `[tool]` section in the config.
+        let unexpected_keys: Vec<String> = self
             .root
             .keys()
-            .filter(|k| (*k).ne(&"tool".to_owned()))
+            .filter(|k| (*k).ne("tool"))
+            .map(String::clone)
             .collect();
-        if !disallowed_root_keys.is_empty() {
-            return Err(format!(
-                "Disallowed top-level keys found: {disallowed_root_keys:?}"
-            ));
+        if !unexpected_keys.is_empty() {
+            log::warn!(
+                "Unexpected top-level `[*]` keys found in profile `{}`: {}",
+                self.name,
+                unexpected_keys.join(", ")
+            );
+            unexpected_keys.iter().for_each(|k| {
+                self.root.remove(k);
+            });
         }
 
-        let tool_value = self.root.get(&"tool".to_owned());
-        match tool_value {
+        // Check that the `[tool]` section contains no unexpected keys.
+        match self.root.get(&"tool".to_owned()) {
             Some(Value::Table(table)) => {
-                let disallowed_tool_keys: Vec<&String> = table
+                let unexpected_keys: Vec<String> = table
                     .keys()
-                    .filter(|k| !ACCEPTED_TOOLS.contains(&k.as_str()))
+                    .filter(|k| !is_known_tool(*k))
+                    .map(String::clone)
                     .collect();
-                if !disallowed_tool_keys.is_empty() {
-                    return Err(format!(
-                        "Disallowed [tool.*] keys found: {disallowed_tool_keys:?}"
-                    ));
+                if !unexpected_keys.is_empty() {
+                    log::warn!(
+                        "Unexpected `[tool.*]` keys found in profile `{}`: {}",
+                        self.name,
+                        unexpected_keys.join(", ")
+                    );
+                    unexpected_keys.iter().for_each(|k| {
+                        self.root.remove(k);
+                    });
                 }
             }
             _ => {
-                return Err("Missing or invalid tool top-level key".to_owned());
+                log::warn!("The `tool` key in profile `{}` is not a table.", self.name);
+                self.root.remove("tool");
             }
         }
-
-        Ok(())
     }
 
     /// Merge the profile with a `pyproject.toml`, giving precedence to the values defined in
     /// the `pyproject.toml`.
-    pub fn merge(&self, pyproject_toml: &Table) -> Result<Table, String> {
+    pub fn merge(&self, pyproject_toml: &Table) -> Table {
         // Helper function to recursively merge tables
-        fn merge_tables(base: &Table, override_table: &Table) -> Result<Table, String> {
+        fn merge_tables(base: &Table, override_table: &Table) -> Table {
             let mut result = Table::new();
 
             // Process all keys from both tables
@@ -84,12 +168,10 @@ impl Profile {
                 match (base_value, override_value) {
                     // If both are tables, recursively merge them
                     (Some(Value::Table(base_table)), Some(Value::Table(override_table))) => {
-                        match merge_tables(base_table, override_table) {
-                            Ok(merged_table) => {
-                                result.insert(key.clone(), Value::Table(merged_table));
-                            }
-                            Err(e) => return Err(e),
-                        }
+                        result.insert(
+                            key.clone(),
+                            Value::Table(merge_tables(base_table, override_table)),
+                        );
                     }
                     // If both are arrays, use the override array
                     (Some(Value::Array(_)), Some(Value::Array(override_array))) => {
@@ -108,43 +190,48 @@ impl Profile {
                 }
             }
 
-            Ok(result)
+            result
         }
 
         // Merge the root table with the pyproject_toml
         merge_tables(&self.root, pyproject_toml)
     }
-}
 
-/// Loads the default profile and merges it with the current project's `pyproject.toml`, returning
-/// the final `pyproject.toml`.
-pub fn materialize_pyproject_toml() -> Table {
-    // TODO: Check if the pyproject_toml contains `tool.tire.inflated=true`. If yes, we don't
-    //       actually want to merge the profile in.
+    /// Writes the updated `pyproject.toml` to a `.tire/pyproject.toml` file in the project
+    /// root directory of the given working directory. If the project has no `pyproject.toml`,
+    /// the current working directory is assumed to be the project root.
+    ///
+    /// Returns the path to the `.tire/pyproject.toml` file.
+    ///
+    /// TODO: Support Uv workspaces (see https://github.com/NiklasRosenstein/tire/issues/2)
+    pub fn materialize(&self, cwd: Option<PathBuf>) -> Result<PathBuf, Error> {
+        let cwd = cwd.ok_or("").or_else(|_| std::env::current_dir())?;
 
-    // Load the project's pyproject.toml
-    let pyproject_toml_file = find_pyproject_toml().unwrap();
-    let pyproject_toml = std::fs::read_to_string(pyproject_toml_file.clone()).unwrap();
-    let pyproject_toml = pyproject_toml.parse::<toml::Table>().unwrap();
+        let pyproject_toml_file = find_pyproject_toml(Some(cwd));
 
-    // Load the profile for the project
-    let profile = Profile::load_file(Path::new("../profiles/default.toml")).unwrap();
-    profile.validate().unwrap();
+        // The project root is where we place the `.tire/pyproject.toml` file.
+        let project_root = if let Some(file) = pyproject_toml_file.clone() {
+            file.parent().unwrap().to_path_buf()
+        } else {
+            std::env::current_dir()?
+        };
+        let out_file = project_root.join(".tire").join("pyproject.toml");
+        std::fs::create_dir_all(out_file.parent().unwrap())?;
 
-    // Merge the profile and the pyproject.toml
-    profile.merge(&pyproject_toml).unwrap()
-}
+        // Load the project's configuration.
+        let pyproject_toml = if let Some(file) = pyproject_toml_file {
+            let content = std::fs::read_to_string(file).unwrap();
+            content.parse::<toml::Table>()?
+        } else {
+            Table::new()
+        };
 
-/// Same as [`material_pyproject_toml`], but writes it to a temporary file.
-pub fn materialize_pyproject_toml_to_tmp() -> TemporaryMaterializedPyprojectToml {
-    let merged_toml = toml::to_string(&materialize_pyproject_toml()).unwrap();
-    let dir = tempfile::TempDir::new().unwrap();
-    let path = dir.path().join("pyproject.toml");
-    std::fs::write(&path, merged_toml.as_bytes()).unwrap();
-    TemporaryMaterializedPyprojectToml { _dir: dir, path }
-}
+        // Merge the configuration and write it to the output file.
+        std::fs::write(
+            out_file.clone(),
+            toml::to_string(&self.merge(&pyproject_toml))?,
+        )?;
 
-pub struct TemporaryMaterializedPyprojectToml {
-    _dir: TempDir,
-    pub path: PathBuf,
+        Ok(out_file)
+    }
 }

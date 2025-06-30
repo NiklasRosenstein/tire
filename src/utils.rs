@@ -31,9 +31,11 @@ pub fn run_command_or_exit(command: Vec<String>) {
     }
 }
 
-/// Find the `pyproject.toml` in the current working directory or any of its parent directories.
-pub fn find_pyproject_toml() -> Option<PathBuf> {
-    let mut dir = std::env::current_dir().unwrap();
+/// Find a `pyproject.toml` file starting from the specified *cwd* (or the processes' current dir
+/// if [None] is specified), walking up the file system hierarchy until it is found or return
+/// [None].
+pub fn find_pyproject_toml(cwd: Option<PathBuf>) -> Option<PathBuf> {
+    let mut dir = cwd.ok_or("").or_else(|_| std::env::current_dir()).unwrap();
     loop {
         let file = dir.join("pyproject.toml");
         if std::fs::exists(&file).unwrap() {

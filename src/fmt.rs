@@ -1,13 +1,13 @@
 //! Implements the `tire check` command.
 
 use crate::{
-    profile::materialize_pyproject_toml_to_tmp,
+    profile::Profile,
     utils::{run_command_or_exit, string_vec},
 };
 
 pub fn fmt(files: Vec<String>, check: bool) {
     // Write the merged configuration to a temporary file
-    let pyproject_toml = materialize_pyproject_toml_to_tmp();
+    let pyproject_toml = Profile::load(None).unwrap().materialize(None).unwrap();
 
     // TODO: Do not fail fast on the commands.
 
@@ -20,7 +20,7 @@ pub fn fmt(files: Vec<String>, check: bool) {
             "ruff",
             "ruff",
             "--config",
-            pyproject_toml.path.to_string_lossy().to_string(),
+            pyproject_toml.to_string_lossy().to_string(),
             "format"
         ];
 
@@ -47,7 +47,7 @@ pub fn fmt(files: Vec<String>, check: bool) {
             "ruff",
             "ruff",
             "--config",
-            pyproject_toml.path.to_string_lossy().to_string(),
+            pyproject_toml.to_string_lossy().to_string(),
             "check",
             "--select",
             "I"

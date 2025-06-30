@@ -30,11 +30,12 @@ mod tests {
 
         // Create a Profile instance
         let profile = Profile {
+            name: "test".to_owned(),
             root: profile_table,
         };
 
         // Merge the profiles
-        let merged = profile.merge(&pyproject_table).unwrap();
+        let merged = profile.merge(&pyproject_table);
 
         // Check that the merged profile has the expected values
         assert_eq!(
