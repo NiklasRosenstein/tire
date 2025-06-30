@@ -46,11 +46,10 @@ pub fn run(args: Vec<String>) {
         let module = target.split(':').next().unwrap();
         let func = target.split(':').nth(1).unwrap();
         let code = format!(
-            "import sys, cyclopts, {}; \
-            app = cyclopts.App(name='{}:{}', version_flags=[]); \
-            app.default({}.{}); \
-            app();",
-            module, module, func, module, func
+            "import sys, cyclopts, {module}; \
+            app = cyclopts.App(name='{module}:{func}', version_flags=[]); \
+            app.default({module}.{func}); \
+            app();"
         );
         uv_command = vec![
             "uv",
@@ -82,7 +81,7 @@ pub fn run(args: Vec<String>) {
         .expect("Failed to start uv command");
     let status = proc.wait().expect("Failed to wait for uv command");
     if !status.success() {
-        eprintln!("uv command failed with status: {}", status);
+        eprintln!("uv command failed with status: {status}");
         std::process::exit(status.code().unwrap_or(1));
     }
 }
