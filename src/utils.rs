@@ -15,6 +15,7 @@ pub(crate) use string_vec;
 /// Run the given command. If the command exits with a non-zero status code, print to stderr
 /// and exit the process.
 pub fn run_command_or_exit(command: Vec<String>) {
+    eprintln!("[tire] $ {command:?}");
     let program = &command[0];
     let mut proc = std::process::Command::new(program)
         .args(command[1..].iter())
