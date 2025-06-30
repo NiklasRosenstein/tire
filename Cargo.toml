@@ -1,6 +1,6 @@
 [package]
 name = "tire"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "Tire provides a single interface for the most common workflows in a typical, modern Python project."
