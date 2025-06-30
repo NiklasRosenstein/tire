@@ -1,5 +1,7 @@
 //! Implements the behaviour of the `tire run` command.
 
+use crate::utils::{run_command_or_exit, string_vec};
+
 pub fn run(args: Vec<String>) {
     // Extract options until the first positional argument to pass to `uv run`.
     // TODO: Should we assume options with the `--` prefix to always consume an additional arg?
@@ -33,10 +35,7 @@ pub fn run(args: Vec<String>) {
     // If the target starts with `@`, it references a package name and the command is similar
     // to using `uvx`.
     if target.starts_with("@") {
-        uv_command = vec!["uv", "run", "--with", target.strip_prefix("@").unwrap()]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        uv_command = string_vec!["uv", "run", "--with", target.strip_prefix("@").unwrap()];
         uv_command.extend(uv_args);
         uv_command.push(String::from(target.strip_prefix("@").unwrap()));
     }
@@ -51,22 +50,19 @@ pub fn run(args: Vec<String>) {
             app.default({module}.{func}); \
             app();"
         );
-        uv_command = vec![
+        uv_command = string_vec![
             "uv",
             "run",
             "--with",
             "cyclopts>=3.0.0,<4.0.0",
             "python",
             "-c",
-            code.as_str(),
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
+            code.as_str()
+        ];
     }
     // Otherwise we pass it to UV directly.
     else {
-        uv_command = vec!["uv", "run"].into_iter().map(String::from).collect();
+        uv_command = string_vec!["uv", "run"];
     }
 
     // Append the arguments for the called target.
@@ -75,13 +71,5 @@ pub fn run(args: Vec<String>) {
     eprintln!("uv_command={uv_command:?}");
 
     // Invoke the command.
-    let mut proc = std::process::Command::new(&uv_command[0])
-        .args(uv_command[1..].iter())
-        .spawn()
-        .expect("Failed to start uv command");
-    let status = proc.wait().expect("Failed to wait for uv command");
-    if !status.success() {
-        eprintln!("uv command failed with status: {status}");
-        std::process::exit(status.code().unwrap_or(1));
-    }
+    run_command_or_exit(uv_command)
 }

@@ -57,4 +57,12 @@ pub enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+
+    /// Run type-checking on your Python project.
+    Check {
+        /// A list of files to type-check. If not specified, all `*.py` files in the current
+        /// directory (recursive) will be checked.
+        #[arg(name = "file")]
+        files: Vec<String>,
+    },
 }

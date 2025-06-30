@@ -1,18 +1,17 @@
-mod add;
-mod args;
-mod run;
-
-use crate::args::{Args, Cmd};
 use clap::Parser;
+use tire::args::{Args, Cmd};
 
 fn main() {
     let args = Args::parse();
     match args.cmd {
+        Cmd::Check { files } => {
+            tire::check::check(files);
+        }
         Cmd::Add { args: pkgs, auto } => {
-            crate::add::add(pkgs, auto);
+            tire::add::add(pkgs, auto);
         }
         Cmd::Run { args } => {
-            crate::run::run(args);
+            tire::run::run(args);
         }
     }
 }
