@@ -12,6 +12,24 @@ pub struct Args {
 #[derive(Subcommand)]
 #[clap(verbatim_doc_comment)]
 pub enum Cmd {
+    /// Add one or more packages to your Python project.
+    ///
+    /// This command is analogous to the `uv add` command, but provides an additional `--auto` flag.
+    Add {
+        /// Parse all `*.py` files in your project, looking for imports that can be mapped to
+        /// known Python packages. Note that this option must be specified first if any other
+        /// options are being passed to `uv add` with `[PKGS]...`.
+        ///
+        /// Not yet implemented.
+        #[arg(short, long)]
+        auto: bool,
+
+        /// One or more requirement specs that represent packages to add to the project, as well as
+        /// any additional flags to pass along to `uv add`.
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
     /// Call a Python script, module, function or package.
     ///
     /// This command is analogous to the `uv run` command, but provides a bit more flexibility and
@@ -34,7 +52,8 @@ pub enum Cmd {
     /// To see which additional arguments you can pass to `tire run` before the first positional
     /// argument, check the Uv documentation with `uv run --help`.
     Run {
-        // Remaining arguments are passed to UV.
+        /// Arguments to pass to Uv. Requires at least one positional argument. The expected format
+        /// is roughly: [UV_ARGS]... <TARGET> [TARGET_ARGS]...
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
