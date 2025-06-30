@@ -9,28 +9,60 @@ pub fn fmt(files: Vec<String>, check: bool) {
     // Write the merged configuration to a temporary file
     let pyproject_toml = materialize_pyproject_toml_to_tmp();
 
+    // TODO: Do not fail fast on the commands.
+
     // Run dmypy with the merged config file
-    let mut uv_command = string_vec![
-        "uv",
-        "run",
-        "--with",
-        "ruff",
-        "ruff",
-        "--config",
-        pyproject_toml.path.to_string_lossy().to_string(),
-        "format"
-    ];
+    {
+        let mut uv_command = string_vec![
+            "uv",
+            "run",
+            "--with",
+            "ruff",
+            "ruff",
+            "--config",
+            pyproject_toml.path.to_string_lossy().to_string(),
+            "format"
+        ];
 
-    if check {
-        uv_command.push("--check".to_owned());
+        if check {
+            uv_command.push("--check".to_owned());
+        }
+
+        if files.is_empty() {
+            uv_command.push(".".to_owned());
+        } else {
+            uv_command.extend(files.clone());
+        }
+
+        run_command_or_exit(uv_command);
     }
 
-    if files.is_empty() {
-        uv_command.push(".".to_owned());
-    } else {
-        uv_command.extend(files);
-    }
+    // Check isort rules
+    // TODO: Only if the profile includes `select = ["I"]` in the ruff config
+    {
+        let mut uv_command = string_vec![
+            "uv",
+            "run",
+            "--with",
+            "ruff",
+            "ruff",
+            "--config",
+            pyproject_toml.path.to_string_lossy().to_string(),
+            "check",
+            "--select",
+            "I"
+        ];
 
-    // Run the command
-    run_command_or_exit(uv_command);
+        if !check {
+            uv_command.push("--fix".to_owned());
+        }
+
+        if files.is_empty() {
+            uv_command.push(".".to_owned());
+        } else {
+            uv_command.extend(files);
+        }
+
+        run_command_or_exit(uv_command);
+    }
 }

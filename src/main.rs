@@ -13,6 +13,13 @@ fn main() {
         Cmd::Fmt { files, check } => {
             tire::fmt::fmt(files, check);
         }
+        Cmd::Lint {
+            files,
+            fix,
+            unsafe_fixes,
+        } => {
+            tire::lint::lint(files, fix, unsafe_fixes);
+        }
         Cmd::Run { args } => {
             tire::run::run(args);
         }

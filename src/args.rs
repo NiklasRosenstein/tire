@@ -73,7 +73,22 @@ pub enum Cmd {
         files: Vec<String>,
 
         /// Only check whether formatting would modify any files.
-        #[arg(long, short)]
+        #[arg(long)]
         check: bool,
+    },
+
+    /// Lint your code.
+    Lint {
+        /// Files or directories to lint recursively. Defaults to the current working directory.
+        #[arg(name = "file")]
+        files: Vec<String>,
+
+        /// Automatically fix applicable lints.
+        #[arg(long)]
+        fix: bool,
+
+        /// Enable potentially unsafe fixes.
+        #[arg(long)]
+        unsafe_fixes: bool,
     },
 }
