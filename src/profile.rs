@@ -1,6 +1,12 @@
-use std::{error::Error, path::Path};
+use std::{
+    error::Error,
+    path::{Path, PathBuf},
+};
 
+use tempfile::TempDir;
 use toml::value::*;
+
+use crate::utils::find_pyproject_toml;
 
 /// This contains the accepted `[tool.*]` sections that are actually supported by Tire. Any
 /// additional tool sections are not allowed.
@@ -108,4 +114,37 @@ impl Profile {
         // Merge the root table with the pyproject_toml
         merge_tables(&self.root, pyproject_toml)
     }
+}
+
+/// Loads the default profile and merges it with the current project's `pyproject.toml`, returning
+/// the final `pyproject.toml`.
+pub fn materialize_pyproject_toml() -> Table {
+    // TODO: Check if the pyproject_toml contains `tool.tire.inflated=true`. If yes, we don't
+    //       actually want to merge the profile in.
+
+    // Load the project's pyproject.toml
+    let pyproject_toml_file = find_pyproject_toml().unwrap();
+    let pyproject_toml = std::fs::read_to_string(pyproject_toml_file.clone()).unwrap();
+    let pyproject_toml = pyproject_toml.parse::<toml::Table>().unwrap();
+
+    // Load the profile for the project
+    let profile = Profile::load_file(Path::new("../profiles/default.toml")).unwrap();
+    profile.validate().unwrap();
+
+    // Merge the profile and the pyproject.toml
+    profile.merge(&pyproject_toml).unwrap()
+}
+
+/// Same as [`material_pyproject_toml`], but writes it to a temporary file.
+pub fn materialize_pyproject_toml_to_tmp() -> TemporaryMaterializedPyprojectToml {
+    let merged_toml = toml::to_string(&materialize_pyproject_toml()).unwrap();
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("pyproject.toml");
+    std::fs::write(&path, merged_toml.as_bytes()).unwrap();
+    TemporaryMaterializedPyprojectToml { _dir: dir, path }
+}
+
+pub struct TemporaryMaterializedPyprojectToml {
+    _dir: TempDir,
+    pub path: PathBuf,
 }

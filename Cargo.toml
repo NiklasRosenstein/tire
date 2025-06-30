@@ -6,4 +6,5 @@ license = "MIT - OSI approved"
 
 [dependencies]
 clap = { version = "4.5.40", features = ["derive"] }
+tempfile = "3.20.0"
 toml = "0.8.23"

@@ -12,7 +12,7 @@ pub struct Args {
 #[derive(Subcommand)]
 #[clap(verbatim_doc_comment)]
 pub enum Cmd {
-    /// Add one or more packages to your Python project.
+    /// Add dependencies
     ///
     /// This command is analogous to the `uv add` command, but provides an additional `--auto` flag.
     Add {
@@ -58,11 +58,22 @@ pub enum Cmd {
         args: Vec<String>,
     },
 
-    /// Run type-checking on your Python project.
+    /// Type-check your code.
     Check {
-        /// A list of files to type-check. If not specified, all `*.py` files in the current
-        /// directory (recursive) will be checked.
+        /// Files or directories to type-check recursively. Defaults to the current working
+        /// directory.
         #[arg(name = "file")]
         files: Vec<String>,
+    },
+
+    /// Format your code.
+    Fmt {
+        /// Files or directories to format recursively. Defaults to the current working directory.
+        #[arg(name = "file")]
+        files: Vec<String>,
+
+        /// Only check whether formatting would modify any files.
+        #[arg(long, short)]
+        check: bool,
     },
 }
