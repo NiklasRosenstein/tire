@@ -2,7 +2,7 @@
 name = "tire"
 version = "0.1.0"
 edition = "2024"
-license = "MIT - OSI approved"
+license = "MIT"
 description = "Tire provides a single interface for the most common workflows in a typical, modern Python project."
 
 [dependencies]
