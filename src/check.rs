@@ -18,22 +18,40 @@ pub fn check(files: Vec<String>) {
     // Load the profile for the project
     let profile = Profile::load_file(Path::new("../profiles/default.toml")).unwrap();
     profile.validate().unwrap();
-    eprintln!("========");
-    eprintln!("profile: {profile:?}");
 
     // Merge the profile and the pyproject.toml
-    let merged = profile.merge(&pyproject_toml);
-    eprintln!("merged: {merged:?}");
-    eprintln!("========");
-    eprintln!("========");
+    let merged = profile.merge(&pyproject_toml).unwrap();
 
-    // TODO: Get Mypy
-    let mut uv_command = string_vec!["uv", "run", "--with", "mypy", "dmypy", "run"];
+    // Write the merged configuration to a temporary file
+    let temp_file = std::env::temp_dir().join("tire_merged_config.toml");
+    let merged_toml = toml::to_string(&merged).unwrap();
+
+    // eprintln!("Final toml: {merged_toml}");
+    std::fs::write(&temp_file, merged_toml).unwrap();
+
+    // Run dmypy with the merged config file
+    let temp_file_path = temp_file.to_string_lossy().to_string();
+    let mut uv_command = string_vec![
+        "uv",
+        "run",
+        "--with",
+        "mypy",
+        "dmypy",
+        "run",
+        "--",
+        "--config-file",
+        temp_file_path.clone()
+    ];
     if files.is_empty() {
         uv_command.push(".".to_owned());
     } else {
         uv_command.extend(files);
     }
 
-    run_command_or_exit(uv_command)
+    // Run the command
+    run_command_or_exit(uv_command);
+
+    // Ensure the temp file is removed afterwards
+    std::fs::remove_file(temp_file)
+        .unwrap_or_else(|_| eprintln!("Failed to remove temporary file: {}", temp_file_path));
 }
