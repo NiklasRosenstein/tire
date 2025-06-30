@@ -19,16 +19,23 @@ pub enum Cmd {
     /// argument are passed to Uv, and all subsequent arguments are passed to the call target.
     ///
     /// Examples:
-    ///
     /// {n}
     /// $ tire run path/to/file.py{n}
     /// $ tire run module:func{n}
     /// $ tire run -m module{n}
     /// $ tire run @pkg{n}
     /// $ tire run --with pkg pkg-cmd2
+    ///
+    /// Differences to Uv:
+    /// {n}
+    /// - The `module:func` version runs the function with the `cyclopts` CLI framework.{n}
+    /// - The `@pkg` version runs as `--with pkg pkg`.
+    ///
+    /// To see which additional arguments you can pass to `tire run` before the first positional
+    /// argument, check the Uv documentation with `uv run --help`.
     Run {
         // Remaining arguments are passed to UV.
-        #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
 }
