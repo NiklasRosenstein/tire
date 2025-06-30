@@ -33,7 +33,7 @@ projects, such as running Python scripts or entrypoints, running tests, linting,
 Almost all commands delegate to Uv in one way or another.
 
 * `tire add` is like `uv add`, with an additional `--auto` option
-* `tire run` is mostly equivalent to `uv run`.
+* `tire run` is mostly equivalent to `uv run`, with some sugar.
 * `tire install` is mostly like `uv sync`
 * `tire check` runs Mypy.
 * `tire fmt` runs Ruff to format your code, organizes imports and `pyproject.toml`.

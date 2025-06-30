@@ -28,7 +28,7 @@ pub fn run(args: Vec<String>) {
     eprintln!("target={target:?}");
     eprintln!("target_args={target_args:?}");
 
-    let mut uv_command = Vec::<String>::new();
+    let mut uv_command: Vec<String>;
 
     // If the target starts with `@`, it references a package name and the command is similar
     // to using `uvx`.
@@ -40,15 +40,34 @@ pub fn run(args: Vec<String>) {
         uv_command.extend(uv_args);
         uv_command.push(String::from(target.strip_prefix("@").unwrap()));
     }
-    // If the target contains a colon, it is a function call in a module.
+    // If the target contains a colon, it is a function call in a module. We wrap it into a
+    // `cyclopts.App` for advanced argument parsing and help formatting.
     else if target.contains(":") {
         let module = target.split(':').next().unwrap();
         let func = target.split(':').nth(1).unwrap();
-        let code = format!("import {}; {}.{}()", module, module, func);
-        uv_command = vec!["uv", "run", "python", "-c", code.as_str()]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let code = format!(
+            "import sys, cyclopts, {}; \
+            app = cyclopts.App(name='{}:{}', version_flags=[]); \
+            app.default({}.{}); \
+            app();",
+            module, module, func, module, func
+        );
+        uv_command = vec![
+            "uv",
+            "run",
+            "--with",
+            "cyclopts>=3.0.0,<4.0.0",
+            "python",
+            "-c",
+            code.as_str(),
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    }
+    // Otherwise we pass it to UV directly.
+    else {
+        uv_command = vec!["uv", "run"].into_iter().map(String::from).collect();
     }
 
     // Append the arguments for the called target.
