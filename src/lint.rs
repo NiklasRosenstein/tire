@@ -16,9 +16,9 @@ pub fn lint(files: Vec<String>, fix: bool, unsafe_fixes: bool) {
         "--with",
         "ruff",
         "ruff",
+        "check",
         "--config",
-        pyproject_toml.to_string_lossy().to_string(),
-        "check"
+        pyproject_toml.to_string_lossy().to_string()
     ];
 
     if fix {

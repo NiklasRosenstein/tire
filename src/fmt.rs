@@ -19,9 +19,9 @@ pub fn fmt(files: Vec<String>, check: bool) {
             "--with",
             "ruff",
             "ruff",
+            "format",
             "--config",
-            pyproject_toml.to_string_lossy().to_string(),
-            "format"
+            pyproject_toml.to_string_lossy().to_string()
         ];
 
         if check {
@@ -46,9 +46,9 @@ pub fn fmt(files: Vec<String>, check: bool) {
             "--with",
             "ruff",
             "ruff",
+            "check",
             "--config",
             pyproject_toml.to_string_lossy().to_string(),
-            "check",
             "--select",
             "I"
         ];
