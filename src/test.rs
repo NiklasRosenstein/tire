@@ -10,6 +10,7 @@ pub fn test(
     _allow_no_tests: bool,
     parallel: Option<i32>,
     filter: Option<String>,
+    doctests: bool,
 ) {
     // Write the merged configuration to a temporary file
     let pyproject_toml = Profile::load(None).unwrap().materialize(None).unwrap();
@@ -37,6 +38,11 @@ pub fn test(
     if let Some(filter) = filter {
         uv_command.push("-k".to_owned());
         uv_command.push(filter);
+    }
+
+    if doctests {
+        uv_command.push("--doctest-modules".to_owned());
+        // TODO(@niklas): Add support for --doctest-glob (with as little config required by the user as possible)
     }
 
     if files.is_empty() {

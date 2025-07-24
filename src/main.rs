@@ -111,6 +111,10 @@ pub enum Cmd {
         /// Run only tests that contain the given substring. Same as `pytest -k`.
         #[arg(long)]
         filter: Option<String>,
+
+        /// Disable running Python doctests.
+        #[arg(long, default_value_t = false)]
+        no_doctests: bool,
     },
 }
 
@@ -141,8 +145,9 @@ fn main() {
             allow_no_tests,
             parallel,
             filter,
+            no_doctests,
         } => {
-            tire::test::test(files, allow_no_tests, parallel, filter);
+            tire::test::test(files, allow_no_tests, parallel, filter, !no_doctests);
         }
     }
 }
