@@ -5,3 +5,11 @@ typos = "1.33.1"
 
 [tasks.setup]
 run = "ln -sf ../../.github/pre-commit .git/hooks"
+
+[tasks.bump]
+run = """
+sed -i.bak "s/^version = \\".*\\"/version = \\"{{arg(name="version")}}\\"/" Cargo.toml
+rm Cargo.toml.bak
+cargo update
+git add Cargo.*
+"""
