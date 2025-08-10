@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use toml::value::*;
 
-use crate::utils::find_pyproject_toml;
+use crate::utils::{find_pyproject_toml, extract_min_python_version};
 
 /// The default profile configuration that comes with Tire.
 const DEFAULT_PROFILE: &str = include_str!("../profiles/default.toml");
@@ -226,12 +226,52 @@ impl Profile {
             Table::new()
         };
 
-        // Merge the configuration and write it to the output file.
+        // Extract the minimum Python version from the project configuration
+        let min_python_version = pyproject_toml
+            .get("project")
+            .and_then(|project| project.as_table())
+            .and_then(|project| project.get("requires-python"))
+            .and_then(|requires_python| requires_python.as_str())
+            .and_then(|requires_python| extract_min_python_version(Some(requires_python)))
+            .unwrap_or_else(|| "3.8".to_string()); // Default fallback
+
+        // Merge the configuration and perform placeholder substitution
+        let mut merged = self.merge(&pyproject_toml);
+        Self::substitute_python_version(&mut merged, &min_python_version);
+
         std::fs::write(
             out_file.clone(),
-            toml::to_string(&self.merge(&pyproject_toml))?,
+            toml::to_string(&merged)?,
         )?;
 
         Ok(out_file)
+    }
+
+    /// Recursively substitute `${TIRE_MIN_PYTHON_VERSION}` placeholders with the actual minimum Python version.
+    pub fn substitute_python_version(table: &mut Table, python_version: &str) {
+        for (_, value) in table.iter_mut() {
+            match value {
+                Value::String(s) => {
+                    if s == "${TIRE_MIN_PYTHON_VERSION}" {
+                        *s = python_version.to_string();
+                    }
+                }
+                Value::Table(nested_table) => {
+                    Self::substitute_python_version(nested_table, python_version);
+                }
+                Value::Array(array) => {
+                    for item in array.iter_mut() {
+                        if let Value::String(s) = item {
+                            if s == "${TIRE_MIN_PYTHON_VERSION}" {
+                                *s = python_version.to_string();
+                            }
+                        } else if let Value::Table(nested_table) = item {
+                            Self::substitute_python_version(nested_table, python_version);
+                        }
+                    }
+                }
+                _ => {} // Other value types don't need substitution
+            }
+        }
     }
 }

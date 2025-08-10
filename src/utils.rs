@@ -47,3 +47,89 @@ pub fn find_pyproject_toml(cwd: Option<PathBuf>) -> Option<PathBuf> {
         }
     }
 }
+
+/// Parse the `requires-python` field from a pyproject.toml and extract the minimum Python version.
+/// 
+/// Examples:
+/// - ">=3.9" -> Some("3.9")
+/// - ">=3.8,<4.0" -> Some("3.8") 
+/// - "~=3.9.0" -> Some("3.9")
+/// - ">3.8" -> Some("3.9") (bumped to next minor version)
+/// 
+/// Returns None if the field is not present or cannot be parsed.
+pub fn extract_min_python_version(requires_python: Option<&str>) -> Option<String> {
+    let requires_python = requires_python?.trim();
+    
+    // Split on comma to handle multiple constraints and take the first one
+    let first_constraint = requires_python.split(',').next()?.trim();
+    
+    // Handle >=X.Y format
+    if let Some(version_part) = first_constraint.strip_prefix(">=") {
+        let version_part = version_part.trim();
+        // Extract major.minor from version like "3.9" or "3.9.0"
+        let parts: Vec<&str> = version_part.split('.').collect();
+        if parts.len() >= 2 {
+            return Some(format!("{}.{}", parts[0], parts[1]));
+        }
+    }
+    
+    // Handle ~=X.Y format (compatible release)
+    if let Some(version_part) = first_constraint.strip_prefix("~=") {
+        let version_part = version_part.trim();
+        let parts: Vec<&str> = version_part.split('.').collect();
+        if parts.len() >= 2 {
+            return Some(format!("{}.{}", parts[0], parts[1]));
+        }
+    }
+    
+    // Handle >X.Y format (greater than - bump to next minor version)
+    if let Some(version_part) = first_constraint.strip_prefix(">") {
+        let version_part = version_part.trim();
+        let parts: Vec<&str> = version_part.split('.').collect();
+        if parts.len() >= 2 {
+            if let (Ok(major), Ok(minor)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                return Some(format!("{}.{}", major, minor + 1));
+            }
+        }
+    }
+    
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_min_python_version() {
+        // Test >=X.Y format
+        assert_eq!(extract_min_python_version(Some(">=3.9")), Some("3.9".to_string()));
+        assert_eq!(extract_min_python_version(Some(">=3.8")), Some("3.8".to_string()));
+        assert_eq!(extract_min_python_version(Some(">=3.10")), Some("3.10".to_string()));
+        
+        // Test with patch version
+        assert_eq!(extract_min_python_version(Some(">=3.9.0")), Some("3.9".to_string()));
+        
+        // Test with spaces
+        assert_eq!(extract_min_python_version(Some(">= 3.9")), Some("3.9".to_string()));
+        assert_eq!(extract_min_python_version(Some(">=  3.8  ")), Some("3.8".to_string()));
+        
+        // Test multiple constraints (should use first one)
+        assert_eq!(extract_min_python_version(Some(">=3.8,<4.0")), Some("3.8".to_string()));
+        assert_eq!(extract_min_python_version(Some(">=3.9, !=3.9.7")), Some("3.9".to_string()));
+        
+        // Test ~= format (compatible release)
+        assert_eq!(extract_min_python_version(Some("~=3.9.0")), Some("3.9".to_string()));
+        assert_eq!(extract_min_python_version(Some("~=3.8")), Some("3.8".to_string()));
+        
+        // Test > format (should bump to next minor version)
+        assert_eq!(extract_min_python_version(Some(">3.8")), Some("3.9".to_string()));
+        assert_eq!(extract_min_python_version(Some(">3.7")), Some("3.8".to_string()));
+        
+        // Test edge cases
+        assert_eq!(extract_min_python_version(None), None);
+        assert_eq!(extract_min_python_version(Some("")), None);
+        assert_eq!(extract_min_python_version(Some("invalid")), None);
+        assert_eq!(extract_min_python_version(Some("==3.9")), None); // Not supported format
+    }
+}
