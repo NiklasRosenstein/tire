@@ -63,9 +63,52 @@ mod tests {
             merged.get("tool").unwrap()["mypy"]["warn_no_return"],
             Value::Boolean(true)
         );
+        // NOTE: The placeholder should still be there since we didn't call materialize()
         assert_eq!(
             merged.get("tool").unwrap()["mypy"]["python_version"],
             Value::String("${TIRE_MIN_PYTHON_VERSION}".to_string())
+        );
+    }
+
+    #[test]
+    fn test_python_version_substitution() {
+        // Load the default profile
+        let profile_content = fs::read_to_string("profiles/default.toml").unwrap();
+        let profile_table: Table = profile_content.parse().unwrap();
+
+        // Create a pyproject.toml with requires-python
+        let pyproject_content = r#"
+            [project]
+            name = "test-project"
+            version = "0.1.0"
+            requires-python = ">=3.9"
+
+            [tool.mypy]
+            strict = false
+        "#;
+
+        let pyproject_table: Table = pyproject_content.parse().unwrap();
+
+        // Create a Profile instance
+        let profile = Profile {
+            name: "test".to_owned(),
+            root: profile_table,
+        };
+
+        // Merge the profiles and apply substitution
+        let mut merged = profile.merge(&pyproject_table);
+        Profile::substitute_python_version(&mut merged, "3.9");
+
+        // Check that the placeholder was replaced
+        assert_eq!(
+            merged.get("tool").unwrap()["mypy"]["python_version"],
+            Value::String("3.9".to_string())
+        );
+
+        // Check that other values are still correct
+        assert_eq!(
+            merged.get("tool").unwrap()["mypy"]["strict"],
+            Value::Boolean(false)
         );
     }
 }
