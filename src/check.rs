@@ -2,7 +2,7 @@
 
 use crate::{
     profile::Profile,
-    utils::{run_command_or_exit, string_vec},
+    utils::{run_command_or_exit, string_vec, find_workspace_root},
 };
 
 pub fn check(files: Vec<String>) {
@@ -11,13 +11,12 @@ pub fn check(files: Vec<String>) {
 
     // The dmypy status file should sit next to the pyproject.toml, to reuse the same daemon
     // for the same project even if run in a subdirectory.
-    // TODO: Use the root `pyproject.toml` for a Uv workspace project if the current project is
-    //       a workspace member.
-    let status_file = pyproject_toml
-        .parent()
-        .unwrap()
-        .join(".dmypy.json")
-        .to_path_buf();
+    // If the current project is a workspace member, use the workspace root instead.
+    let status_file_dir = match find_workspace_root(&pyproject_toml) {
+        Some(workspace_root) => workspace_root.parent().unwrap().to_path_buf(),
+        None => pyproject_toml.parent().unwrap().to_path_buf(),
+    };
+    let status_file = status_file_dir.join(".dmypy.json");
 
     // Run dmypy with the merged config file
     let mut uv_command = string_vec![
