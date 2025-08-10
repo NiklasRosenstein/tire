@@ -47,3 +47,42 @@ pub fn find_pyproject_toml(cwd: Option<PathBuf>) -> Option<PathBuf> {
         }
     }
 }
+
+/// Find the workspace root `pyproject.toml` if the given project is part of a UV workspace.
+/// 
+/// This function starts from the given `pyproject.toml` file and walks up the directory tree
+/// looking for a workspace root (a `pyproject.toml` with a `[tool.uv.workspace]` section).
+/// Returns the path to the workspace root `pyproject.toml` if found, otherwise [None].
+pub fn find_workspace_root(project_pyproject_toml: &std::path::Path) -> Option<PathBuf> {
+    let mut dir = project_pyproject_toml.parent()?;
+    
+    // Walk up the directory tree looking for a workspace root
+    loop {
+        let candidate = dir.join("pyproject.toml");
+        
+        // Skip if this is the same file we started with
+        if candidate == project_pyproject_toml {
+            dir = dir.parent()?;
+            continue;
+        }
+        
+        if std::fs::exists(&candidate).unwrap_or(false) {
+            // Check if this pyproject.toml defines a workspace
+            if let Ok(content) = std::fs::read_to_string(&candidate) {
+                if let Ok(table) = content.parse::<toml::Table>() {
+                    // Check for [tool.uv.workspace] section
+                    if let Some(toml::Value::Table(tool_table)) = table.get("tool") {
+                        if let Some(toml::Value::Table(uv_table)) = tool_table.get("uv") {
+                            if uv_table.contains_key("workspace") {
+                                return Some(candidate);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Move up to the parent directory
+        dir = dir.parent()?;
+    }
+}
